@@ -1,0 +1,86 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Creates an Amazon SQS fifo queue with long-polling."
+Parameters: 
+  QueueName: 
+    Default: "demo-queue.fifo"
+    Description: "Name of the fifo queue (must end with .fifo)"
+    Type: "String"
+  RoleName:
+    Default: "app-vm-role"
+    Description: "Name of the role to be attached to an EC2 instance"
+    Type: "String"  
+  Owner: 
+    Type: String
+    Default: Siddharth
+    Description: Your name or email id goes here
+
+Resources: 
+  MyQueue: 
+    Type: AWS::SQS::Queue
+    Properties: 
+      QueueName: !Ref QueueName
+      FifoQueue: true
+      MaximumMessageSize: 1024
+      MessageRetentionPeriod: 300
+      ReceiveMessageWaitTimeSeconds: 10
+      VisibilityTimeout: 60
+      Tags:
+        - Key: Owner
+          Value: !Ref Owner
+
+  Ec2IAMRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Ref RoleName
+      AssumeRolePolicyDocument: 
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: [ec2.amazonaws.com]
+            Action: ['sts:AssumeRole']
+      Path: /
+      Policies:
+        - PolicyName: AllowAccessToTheSQSQueue  
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+            - Effect: Allow
+              Action:
+              - sqs:DeleteMessage
+              - sqs:GetQueueUrl
+              - sqs:ListDeadLetterSourceQueues
+              - sqs:ChangeMessageVisibility
+              - sqs:PurgeQueue
+              - sqs:ReceiveMessage
+              - sqs:SendMessage
+              - sqs:GetQueueAttributes
+              - sqs:ListQueueTags
+              - s3:GetObject
+              - s3:PutObject
+              - s3:PutObjectAcl
+              Resource: !GetAtt MyQueue.Arn
+
+  Ec2InstanceProfile: 
+    Type: "AWS::IAM::InstanceProfile"    
+    Properties: 
+      InstanceProfileName: !Ref RoleName
+      Path: "/"
+      Roles: [ !Ref Ec2IAMRole ]
+
+Outputs: 
+  QueueURL: 
+    Description: "URL of new Amazon SQS Queue"
+    Value: 
+      Ref: "MyQueue"
+  QueueARN: 
+    Description: "ARN of new AmazonSQS Queue"
+    Value: 
+      Fn::GetAtt: 
+        - "MyQueue"
+        - "Arn"
+  QueueName: 
+    Description: "Name of new Amazon SQS Queue"
+    Value: 
+      Fn::GetAtt: 
+        - "MyQueue"
+        - "QueueName"
